@@ -7,7 +7,7 @@
  const id = () => globalThis.crypto?.randomUUID?.() || ('ba-'+Date.now()+'-'+Math.random().toString(36).slice(2));
  const CATEGORIES = ['Alle','Oberteile','Hosen & Röcke','Kleider','Jacken','Schuhe','Taschen','Accessoires','Sonstiges','♡ Favoriten'];
  const state = {garments:[],looks:[],plans:[],layers:[],chosen:null,currentLookId:null,editGarmentId:null,photoData:null,originalData:null,view:'studio',boardMode:'figure',filter:'Alle',search:'',sort:'new'};
- let db, drag=null, toastTimer=null, drawing=false, eraserMode=false, undoStack=[], originalEditorData=null;
+ let db, drag=null, toastTimer=null, drawing=false, editorMode="magic", undoStack=[], originalEditorData=null, originalEditorCanvas=null;
  const editorCanvas=$('#edit-canvas'), editorCtx=editorCanvas.getContext('2d',{willReadFrequently:true});
 
  const requestPromise=req=>new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)});
@@ -24,10 +24,10 @@
  function renderCounts(){$('#wardrobe-count').textContent=state.garments.length;$('#looks-count').textContent=state.looks.length}
  function newImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Bild konnte nicht geladen werden'));img.src=src})}
  function fileData(file){return new Promise((resolve,reject)=>{if(!file?.type.startsWith('image/'))return reject(new Error('Bitte eine Bilddatei auswählen.'));if(file.size>25*1024*1024)return reject(new Error('Das Foto darf maximal 25 MB haben.'));const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Datei konnte nicht gelesen werden'));reader.readAsDataURL(file)})}
- async function resizePhoto(source){const img=await newImage(source);const max=1450, scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));const ctx=c.getContext('2d');ctx.drawImage(img,0,0,c.width,c.height);const hasTransparent=source.slice(0,25).includes('png');return c.toDataURL(hasTransparent?'image/png':'image/jpeg',.87)}
+ async function resizePhoto(source){const img=await newImage(source);const max=1450, scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));const ctx=c.getContext('2d');ctx.drawImage(img,0,0,c.width,c.height);const hasTransparent=source.startsWith('data:image/png')||source.startsWith('data:image/webp');return c.toDataURL(hasTransparent?'image/png':'image/jpeg',.87)}
  async function handlePhoto(file){try{if(!file)return;toast('Foto wird vorbereitet …');const data=await resizePhoto(await fileData(file));state.photoData=data;state.originalData=data;renderPhoto();$('#open-editor').disabled=false;toast('Foto bereit. Du kannst jetzt den Hintergrund bearbeiten.')}catch(err){console.error(err);toast(err.message||'Foto konnte nicht geöffnet werden.')}}
  function renderPhoto(){const holder=$('#photo-preview');holder.replaceChildren();if(!state.photoData){holder.innerHTML=`${icon('photo')}<span>Foto auswählen oder aufnehmen</span><small>JPG, PNG, HEIC (falls unterstützt)</small>`;return}const pic=document.createElement('img');pic.src=state.photoData;pic.alt='Vorschau des Kleidungsstücks';holder.append(pic)}
- function openGarment(item=null){$('#garment-form').reset();state.editGarmentId=item?.id||null;state.photoData=item?.image||null;state.originalData=item?.image||null;$('#garment-modal-title').textContent=item?'Kleidungsstück bearbeiten':'Kleidung hinzufügen';$('#garment-name').value=item?.name||'';$('#garment-category').value=item?.category||'Oberteile';$('#garment-color').value=item?.color||'';$('#garment-season').value=item?.season||'Alle Jahreszeiten';$('#garment-favorite').checked=!!item?.favorite;$('#open-editor').disabled=!item;renderPhoto();openModal('garment-modal')}
+ function openGarment(item=null){$('#garment-form').reset();state.editGarmentId=item?.id||null;state.photoData=item?.image||null;state.originalData=item?.image||null;$('#garment-modal-title').textContent=item?'Kleidungsstück bearbeiten':'Kleidung hinzufügen';$('#garment-name').value=item?.name||'';$('#garment-category').value=item?.category||'Oberteile';$('#garment-color').value=item?.color||'';$('#garment-season').value=item?.season||'Alle Jahreszeiten';$('#garment-favorite').checked=!!item?.favorite;$('#open-editor').disabled=!state.photoData;renderPhoto();openModal('garment-modal')}
  async function saveGarment(e){e.preventDefault();if(!state.photoData)return toast('Bitte zuerst ein Kleidungsfoto auswählen.');const name=$('#garment-name').value.trim();if(!name)return toast('Bitte einen Namen eintragen.');const old=state.garments.find(g=>g.id===state.editGarmentId);const g={id:old?.id||id(),name,category:$('#garment-category').value,color:$('#garment-color').value,season:$('#garment-season').value,favorite:$('#garment-favorite').checked,image:state.photoData,created:old?.created||Date.now(),updated:Date.now()};try{await put('garments',g);state.garments=state.garments.filter(v=>v.id!==g.id).concat(g);closeModal('garment-modal');renderAll();toast(old?'Kleidungsstück aktualisiert.':'Kleidungsstück gespeichert. ♡')}catch(e){console.error(e);toast('Speichern fehlgeschlagen. Prüfe den Gerätespeicher.')}}
  async function deleteGarment(gid){const garment=state.garments.find(g=>g.id===gid);if(!garment)return;const used=state.looks.filter(l=>l.layers.some(x=>x.gid===gid)).length;const text=used?`„${garment.name}“ wird gelöscht und aus ${used} gespeichert(en) Looks entfernt. Fortfahren?`:`„${garment.name}“ wirklich löschen?`;if(!confirm(text))return;try{await remove('garments',gid);state.garments=state.garments.filter(g=>g.id!==gid);state.layers=state.layers.filter(l=>l.gid!==gid);state.chosen=null;for(const look of state.looks){if(look.layers.some(l=>l.gid===gid)){look.layers=look.layers.filter(l=>l.gid!==gid);look.preview=await outfitDataURL(look.layers,look.mode||'figure');await put('looks',look)}}renderAll();toast('Kleidungsstück gelöscht.')}catch(e){console.error(e);toast('Löschen fehlgeschlagen.')}}
  async function favoriteGarment(gid){const garment=state.garments.find(x=>x.id===gid);if(!garment)return;garment.favorite=!garment.favorite;try{await put('garments',garment);renderAll()}catch(e){toast('Favorit konnte nicht gespeichert werden.')}}
@@ -65,28 +65,61 @@
  function renderAll(){renderCounts();renderCloset();renderStrip();renderStudio();renderLooks()}
 
  // Photo editor, no AI: edge-connected color removal + hand-operated eraser.
- async function startEditor(){if(!state.photoData)return;try{const img=await newImage(state.photoData);const factor=Math.min(1,1050/Math.max(img.width,img.height));editorCanvas.width=Math.max(1,Math.round(img.width*factor));editorCanvas.height=Math.max(1,Math.round(img.height*factor));editorCtx.clearRect(0,0,editorCanvas.width,editorCanvas.height);editorCtx.drawImage(img,0,0,editorCanvas.width,editorCanvas.height);originalEditorData=editorCtx.getImageData(0,0,editorCanvas.width,editorCanvas.height);undoStack=[];eraserMode=false;$('#eraser-toggle').textContent='Radierer: aus';$('#eraser-toggle').setAttribute('aria-pressed','false');openModal('editor-modal',true)}catch(e){toast('Foto konnte nicht bearbeitet werden.')}}
+ async function startEditor(){if(!state.photoData)return;try{const img=await newImage(state.photoData);const factor=Math.min(1,1050/Math.max(img.width,img.height));editorCanvas.width=Math.max(1,Math.round(img.width*factor));editorCanvas.height=Math.max(1,Math.round(img.height*factor));editorCtx.clearRect(0,0,editorCanvas.width,editorCanvas.height);editorCtx.drawImage(img,0,0,editorCanvas.width,editorCanvas.height);originalEditorData=editorCtx.getImageData(0,0,editorCanvas.width,editorCanvas.height);originalEditorCanvas=document.createElement('canvas');originalEditorCanvas.width=editorCanvas.width;originalEditorCanvas.height=editorCanvas.height;originalEditorCanvas.getContext('2d').putImageData(originalEditorData,0,0);undoStack=[];setEditorMode('magic');$('#editor-zoom').value='100';setEditorZoom(100);openModal('editor-modal',true)}catch(e){toast('Foto konnte nicht bearbeitet werden.')}}
  function snapshot(){if(undoStack.length>=7)undoStack.shift();undoStack.push(editorCtx.getImageData(0,0,editorCanvas.width,editorCanvas.height))}
  function restoreUndo(){const prev=undoStack.pop();if(prev)editorCtx.putImageData(prev,0,0);else toast('Keine Änderung zum Rückgängigmachen.')}
  function resetImage(){if(originalEditorData){snapshot();editorCtx.putImageData(originalEditorData,0,0)}}
+ // Connected-component color selection. Only the region touched is removed;
+ // a conservative color difference prevents a gray wall from erasing gray fabric.
+ function colorDistance(a,b){const dr=a[0]-b[0],dg=a[1]-b[1],db=a[2]-b[2];return Math.sqrt(.28*dr*dr+.60*dg*dg+.12*db*db)}
+ function floodAt(x,y,tolerance,immediate=false){
+  const w=editorCanvas.width,h=editorCanvas.height,im=editorCtx.getImageData(0,0,w,h),a=im.data;
+  const sx=Math.max(0,Math.min(w-1,Math.floor(x))),sy=Math.max(0,Math.min(h-1,Math.floor(y)));
+  const seed=(sy*w+sx)*4;if(a[seed+3]<8)return 0;
+  const base=[a[seed],a[seed+1],a[seed+2]];
+  const visited=new Uint8Array(w*h),q=new Int32Array(w*h),chosen=[];
+  let head=0,tail=0;q[tail++]=sy*w+sx;visited[sy*w+sx]=1;
+  const threshold=Math.max(6,Number(tolerance)*.75);
+  while(head<tail){const p=q[head++],idx=p*4,c=[a[idx],a[idx+1],a[idx+2]];
+   if(a[idx+3]<5||colorDistance(base,c)>threshold)continue;
+   chosen.push(p);const px=p%w,py=(p-px)/w;
+   if(px>0&&!visited[p-1]){visited[p-1]=1;q[tail++]=p-1}
+   if(px<w-1&&!visited[p+1]){visited[p+1]=1;q[tail++]=p+1}
+   if(py>0&&!visited[p-w]){visited[p-w]=1;q[tail++]=p-w}
+   if(py<h-1&&!visited[p+w]){visited[p+w]=1;q[tail++]=p+w}
+  }
+  const ratio=chosen.length/(w*h);
+  if(ratio>.62){toast('Zu viel Fläche ausgewählt. Empfindlichkeit verringern oder andere Stelle antippen.');return 0}
+  if(chosen.length===0)return 0;
+  snapshot();for(const p of chosen)a[p*4+3]=0;editorCtx.putImageData(im,0,0);
+  if(immediate)toast('Bereich entfernt. Weitere Stellen antippen oder Kanten korrigieren.');return chosen.length
+ }
  function autoRemove(){
    const w=editorCanvas.width,h=editorCanvas.height;if(!w||!h)return;
-   const data=editorCtx.getImageData(0,0,w,h),arr=data.data,refs=[];
-   for(const [x,y] of [[0,0],[w-1,0],[0,h-1],[w-1,h-1]]){const j=(y*w+x)*4;refs.push([arr[j],arr[j+1],arr[j+2]])}
-   const limit=Number($('#auto-tolerance').value)*3;
-   const seen=new Uint8Array(w*h),queue=new Int32Array(w*h);let head=0,tail=0;
-   function possible(p){const i=p*4;if(arr[i+3]===0)return false;const r=arr[i],g=arr[i+1],b=arr[i+2];return refs.some(q=>Math.abs(r-q[0])+Math.abs(g-q[1])+Math.abs(b-q[2])<limit)}
-   function visit(p){if(seen[p])return;seen[p]=1;if(possible(p))queue[tail++]=p}
-   for(let x=0;x<w;x++){visit(x);visit((h-1)*w+x)}for(let y=0;y<h;y++){visit(y*w);visit(y*w+w-1)}
-   while(head<tail){const p=queue[head++],x=p%w,y=(p-x)/w;if(x>0)visit(p-1);if(x<w-1)visit(p+1);if(y>0)visit(p-w);if(y<h-1)visit(p+w)}
-   if(!tail)return toast('Kein einfarbiger Hintergrund erkannt. Nutze den Radierer.');
-   if(tail>w*h*.70&&!confirm('Die Erkennung würde mehr als 70 % des Fotos entfernen. Das Kleidungsstück könnte beschädigt werden. Trotzdem anwenden?'))return;
-   snapshot();for(let i=0;i<tail;i++)arr[queue[i]*4+3]=0;
-   editorCtx.putImageData(data,0,0);toast('Hintergrund bearbeitet. Bitte die Kanten prüfen.');
+   // Try four individual corners at low sensitivity. Skips regions too large to be safe.
+   const tol=Math.min(35,Number($('#auto-tolerance').value));let total=0;
+   for(const [x,y] of [[1,1],[w-2,1],[1,h-2],[w-2,h-2]])total+=floodAt(x,y,tol,false);
+   toast(total?'Randbereiche entfernt – bitte Ergebnis prüfen und ggf. nacharbeiten.':'Nichts Sicheres erkannt. Tippe gezielt auf den Hintergrund.')
  }
+ function setEditorMode(mode){editorMode=mode;for(const [id,m] of [['magic-toggle','magic'],['eraser-toggle','erase'],['restore-toggle','restore']]){const el=$('#'+id);el.classList.toggle('active',mode===m);el.setAttribute('aria-pressed',String(mode===m))}editorCanvas.style.cursor=mode==='magic'?'crosshair':mode==='erase'?'cell':'copy'}
+ function setEditorZoom(v){const factor=Number(v)/100;const view=$('#editor-viewport');editorCanvas.style.width=(factor*100)+'%';editorCanvas.style.maxWidth='none';editorCanvas.style.maxHeight='none';editorCanvas.style.height='auto';view.style.overflow='auto';$('#editor-zoom-value').textContent=v+' %'}
  function pointOnEditor(e){const box=editorCanvas.getBoundingClientRect();return{x:(e.clientX-box.left)*editorCanvas.width/box.width,y:(e.clientY-box.top)*editorCanvas.height/box.height}}
  let lastPoint=null;
- function strokePoint(pt){const size=Number($('#eraser-size').value)*editorCanvas.width/600;editorCtx.save();editorCtx.globalCompositeOperation='destination-out';editorCtx.lineWidth=size;editorCtx.lineCap='round';editorCtx.lineJoin='round';editorCtx.beginPath();editorCtx.moveTo(lastPoint?.x??pt.x,lastPoint?.y??pt.y);editorCtx.lineTo(pt.x,pt.y);editorCtx.stroke();editorCtx.beginPath();editorCtx.arc(pt.x,pt.y,size/2,0,Math.PI*2);editorCtx.fill();editorCtx.restore();lastPoint=pt}
+ function strokePoint(pt){
+   const size=Number($('#eraser-size').value)*editorCanvas.width/600;
+   editorCtx.save();editorCtx.lineWidth=size;editorCtx.lineCap='round';editorCtx.lineJoin='round';
+   editorCtx.beginPath();editorCtx.moveTo(lastPoint?.x??pt.x,lastPoint?.y??pt.y);editorCtx.lineTo(pt.x,pt.y);
+   if(editorMode==='erase'){editorCtx.globalCompositeOperation='destination-out';editorCtx.stroke();editorCtx.beginPath();editorCtx.arc(pt.x,pt.y,size/2,0,Math.PI*2);editorCtx.fill()}
+   else if(editorMode==='restore'&&originalEditorCanvas){
+    const from=lastPoint||pt, dx=pt.x-from.x,dy=pt.y-from.y,dist=Math.hypot(dx,dy),steps=Math.max(1,Math.ceil(dist/(size*.25)));
+    for(let t=0;t<=steps;t++){
+      const at=t/steps;
+      editorCtx.save();editorCtx.beginPath();editorCtx.arc(from.x+dx*at,from.y+dy*at,size/2,0,Math.PI*2);
+      editorCtx.clip();editorCtx.drawImage(originalEditorCanvas,0,0);editorCtx.restore();
+    }
+   }
+   editorCtx.restore();lastPoint=pt
+ }
  function cropEdited(){const w=editorCanvas.width,h=editorCanvas.height,px=editorCtx.getImageData(0,0,w,h).data;let x1=w,y1=h,x2=-1,y2=-1,hasTransparent=false;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const a=px[(y*w+x)*4+3];if(a<240)hasTransparent=true;if(a>8){x1=Math.min(x1,x);y1=Math.min(y1,y);x2=Math.max(x2,x);y2=Math.max(y2,y)}}if(x2===-1)throw new Error('Das gesamte Bild wurde entfernt. Bitte wiederherstellen.');if(!hasTransparent)return editorCanvas.toDataURL('image/png');const padding=Math.round(Math.max(x2-x1,y2-y1)*.035);x1=Math.max(0,x1-padding);y1=Math.max(0,y1-padding);x2=Math.min(w-1,x2+padding);y2=Math.min(h-1,y2+padding);const out=document.createElement('canvas');out.width=x2-x1+1;out.height=y2-y1+1;out.getContext('2d').drawImage(editorCanvas,x1,y1,out.width,out.height,0,0,out.width,out.height);return out.toDataURL('image/png')}
  function editorApply(){try{state.photoData=cropEdited();renderPhoto();closeModal('editor-modal');toast('Bearbeitetes Bild übernommen. Speichere jetzt das Kleidungsstück.')}catch(e){toast(e.message)}}
 
@@ -102,8 +135,10 @@
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){const open=$$('.modal').filter(m=>!m.hidden).at(-1);if(open)closeModal(open.id);else if(state.chosen){state.chosen=null;renderSelected()}}});
   $('#open-settings').onclick=()=>openModal('settings-modal');$('#choose-photo').onclick=()=>$('#garment-photo').click();$('#photo-preview').onclick=()=>$('#garment-photo').click();$('#garment-photo').onchange=e=>handlePhoto(e.target.files?.[0]);$('#garment-form').onsubmit=saveGarment;$('#open-editor').onclick=startEditor;
   $('#close-editor').onclick=$('#editor-cancel').onclick=()=>closeModal('editor-modal');$('#auto-tolerance').oninput=e=>$('#tolerance-value').textContent=e.target.value;$('#auto-remove').onclick=autoRemove;$('#editor-undo').onclick=restoreUndo;$('#editor-reset').onclick=resetImage;$('#editor-apply').onclick=editorApply;
-  $('#eraser-toggle').onclick=()=>{eraserMode=!eraserMode;$('#eraser-toggle').textContent=eraserMode?'Radierer: an':'Radierer: aus';$('#eraser-toggle').setAttribute('aria-pressed',String(eraserMode));editorCanvas.style.cursor=eraserMode?'crosshair':'default'};
-  editorCanvas.addEventListener('pointerdown',e=>{if(!eraserMode)return;e.preventDefault();snapshot();drawing=true;lastPoint=null;editorCanvas.setPointerCapture(e.pointerId);strokePoint(pointOnEditor(e))});editorCanvas.addEventListener('pointermove',e=>{if(drawing)strokePoint(pointOnEditor(e))});for(const ev of ['pointerup','pointercancel','lostpointercapture'])editorCanvas.addEventListener(ev,()=>{drawing=false;lastPoint=null});
+  $('#magic-toggle').onclick=()=>setEditorMode('magic');$('#eraser-toggle').onclick=()=>setEditorMode('erase');$('#restore-toggle').onclick=()=>setEditorMode('restore');
+  $('#editor-zoom').oninput=e=>setEditorZoom(e.target.value);
+  editorCanvas.addEventListener('pointerdown',e=>{e.preventDefault();const point=pointOnEditor(e);if(editorMode==='magic'){floodAt(point.x,point.y,Number($('#auto-tolerance').value),true);return}snapshot();drawing=true;lastPoint=null;editorCanvas.setPointerCapture(e.pointerId);strokePoint(point)});
+  editorCanvas.addEventListener('pointermove',e=>{if(drawing)strokePoint(pointOnEditor(e))});for(const ev of ['pointerup','pointercancel','lostpointercapture'])editorCanvas.addEventListener(ev,()=>{drawing=false;lastPoint=null});
   $('#search-items').oninput=e=>{state.search=e.target.value;renderCloset()};$('#sort-items').onchange=e=>{state.sort=e.target.value;renderCloset()};$('#goto-closet').onclick=()=>switchView('closet');
   $('#mode-figure').onclick=()=>{state.boardMode='figure';renderStudio()};$('#mode-collage').onclick=()=>{state.boardMode='collage';renderStudio()};$('#reset-studio').onclick=resetStudio;$('#save-look').onclick=openLookModal;$('#look-form').onsubmit=saveLook;$('#export-look').onclick=()=>exportOutfit();$('#new-look-nav').onclick=()=>{switchView('studio');if(state.layers.length)toast('Leere die Outfit-Fläche über den Pfeil, um neu anzufangen.')};
   $('#deselect-layer').onclick=()=>{state.chosen=null;renderSelected()};$('#size-slider').oninput=e=>changeSelected('w',Number(e.target.value));$('#rotate-slider').oninput=e=>changeSelected('angle',Number(e.target.value));for(const a of ['forward','back','copy','remove'])$('#layer-'+a).onclick=()=>mutateLayer(a);

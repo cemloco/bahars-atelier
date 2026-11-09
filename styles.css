@@ -8,3 +8,20 @@ footer{display:flex;justify-content:space-between;gap:10px;margin:42px 0 0;paddi
 @media(max-width:700px){.app{padding:0 16px 15px}.site-header{padding:29px 0 21px}.brand{gap:13px}.brand-mark{font-size:45px;letter-spacing:-3px}.brand-divider{height:53px}.brand-word>div{font-size:31px;letter-spacing:-1.5px}.brand-word small{font-size:7px;letter-spacing:2.6px;margin-top:8px}.initials{width:37px;height:37px;font-size:14px}.settings-button{width:35px;height:35px}.top-actions{gap:7px}.tabs{gap:4px;margin-bottom:39px}.tab{padding:13px 0 17px;gap:7px;font-size:12px;white-space:nowrap}.tab .icon{width:19px;height:19px}.tab-bubble{min-width:24px;height:24px;font-size:10px;padding:0 5px}.eyebrow{letter-spacing:3px;font-size:10px;margin-bottom:24px}.intro h1,.page-head h1{font-size:clamp(36px,8vw,49px);letter-spacing:-1.5px;margin-bottom:17px}.subtitle{font-size:14px;margin-bottom:26px}.intro,.page-head{margin-bottom:23px}.intro .primary-btn,.page-head .primary-btn{min-height:56px;font-size:14px}.studio-card,.calendar-card{padding:18px 16px 20px;border-radius:14px}.card-top h2{font-size:30px}.card-top .eyebrow{margin-bottom:12px}.card-top{margin-bottom:18px}.card-top .circle-btn{width:44px;height:44px}.studio-board{aspect-ratio:5/6}.board-footer{gap:8px}.board-hint{font-size:10px}.board-hint .icon{width:14px;height:14px}.toggle-board{margin-left:auto}.piece{flex-basis:85px}.piece img{height:74px}.board-buttons{display:grid;grid-template-columns:1fr}.board-buttons .primary-btn,.board-buttons .outline-btn{min-height:48px}.garment-grid,.look-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.garment-photo{height:170px}.garment-details,.look-details{padding:10px}.garment-details h3,.look-details h3{font-size:15px}.closet-toolbar{display:grid;grid-template-columns:1fr}.sort-select{justify-content:flex-end}.plan-form{grid-template-columns:1fr 1fr}.plan-form button{grid-column:1/-1}.sheet{padding:18px 16px 25px;max-height:calc(100dvh - 16px);border-radius:18px}.modal{padding:8px}.photo-preview{min-height:148px}.photo-preview>img{height:160px}.sheet-head h2{font-size:26px}.form-grid{gap:9px}.photo-tools{flex-wrap:wrap}.photo-tools>button{min-width:135px}.tool-buttons button{min-width:75px}.studio-board .canvas-watermark{font-size:7px}.empty-card{padding:30px 15px}footer{font-size:8px;letter-spacing:1px}}
 @media(max-width:380px){.app{padding:0 12px 12px}.brand-word>div{font-size:26px}.brand-word small{font-size:6px}.initials{display:none}.tab{font-size:11px;gap:4px}.tab-bubble{display:none}.sheet-actions>*{font-size:12px;padding:10px}.photo-tools{display:grid}.garment-photo{height:148px}}
 @media(min-width:950px){.studio-board{aspect-ratio:5/6}.silhouette{inset:2% 13% 0}.piece-strip{padding-bottom:18px}.piece{flex-basis:127px}.piece img{height:102px}}
+
+/* Atelier 2.0: elegant figure, precise photo retouching */
+.silhouette{inset:0 9% -1%;opacity:.92;pointer-events:none;filter:drop-shadow(0 8px 18px #827a6e1a)}
+.silhouette svg{width:100%;height:100%;display:block}
+.studio-board{background:radial-gradient(ellipse at 49% 41%,#f7f4ec 5%,#ebe9de 85%)}
+.editor-controls-row{flex-wrap:wrap;justify-content:flex-start}
+.editor-controls-row .outline-btn{min-width:0;flex:1;font-size:12px;padding:11px 9px}
+.editor-controls-row .outline-btn.active{background:var(--olive);color:#fff;border-color:var(--olive)}
+.editor-zoom{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--olive)}
+.editor-zoom input{flex:1;min-width:50px;accent-color:var(--olive)}
+.editor-zoom output{min-width:43px;font-variant-numeric:tabular-nums}
+.editor-canvas-wrap{display:block;text-align:center;max-height:46dvh;min-height:230px;touch-action:pan-x pan-y;overscroll-behavior:contain}
+.editor-canvas-wrap canvas{max-height:none;max-width:none;touch-action:none;margin:0 auto}
+.editor-controls{gap:12px}
+.editor-sheet .sheet-head{margin-bottom:12px}
+.editor-sheet .hint{font-size:13px}
+@media (max-width:700px){.silhouette{inset:1% 5% -1%}.editor-sheet{padding-bottom:calc(24px + env(safe-area-inset-bottom))}.editor-controls-row .outline-btn{font-size:11px;min-height:44px}}
