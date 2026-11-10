@@ -9,6 +9,7 @@ async function records(env,type){
  const result=[];
  for(const row of q.results||[]){
   try{const d=JSON.parse(row.data_json);
+   if(d._cloudImages){for(const [field,key] of Object.entries(d._cloudImages))d[field]=await env.ATELIER_IMAGES.get(key)||'';delete d._cloudImages;}
    if(type==='garments'&&row.image_key)d.image=await env.ATELIER_IMAGES.get(row.image_key)||'';
    if(type==='looks'&&row.worn_photo_key)d.wornPhoto=await env.ATELIER_IMAGES.get(row.worn_photo_key)||'';
    result.push(d);
