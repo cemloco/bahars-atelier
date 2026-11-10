@@ -173,6 +173,10 @@ footer{display:flex;justify-content:space-between;gap:10px;margin:42px 0 0;paddi
 
 /* Bahar’s Atelier 8.4 — photographed looks */
 .look-photo-switch{display:flex;gap:5px;padding:8px 9px 0;background:var(--paper)}
+/* Keep the favourite heart clear of the Collage / So getragen tabs on phones. */
+.look-card.has-real-photo .favorite-toggle{top:83px;right:10px}
+.look-photo-switch button{min-height:44px;overflow-wrap:anywhere}
+
 .look-photo-switch button{flex:1;min-width:0;border:1px solid #e0e5db;background:#f8faf5;border-radius:8px;padding:8px 4px;color:var(--olive);font-size:11px;line-height:1.2}
 .look-photo-switch button.active{background:var(--olive);color:#fff;border-color:var(--olive)}
 .look-card .look-preview{margin-top:0}
@@ -490,7 +494,7 @@ footer{display:flex;justify-content:space-between;gap:10px;margin:42px 0 0;paddi
    const hasReal=typeof l.realPhoto==='string'&&l.realPhoto.startsWith('data:image/');
    const showReal=hasReal&&lookPhotoViews[l.id]==='real';
    const image=showReal?l.realPhoto:l.preview||'';
-   return `<article class="look-card"><button class="favorite-toggle ${l.favorite?'favorited':''}" data-fav-look="${l.id}" aria-label="Lieblingslook umschalten">${icon('heart')}</button>
+   return `<article class="look-card ${hasReal?'has-real-photo':''}"><button class="favorite-toggle ${l.favorite?'favorited':''}" data-fav-look="${l.id}" aria-label="Lieblingslook umschalten">${icon('heart')}</button>
     ${hasReal?`<div class="look-photo-switch"><button type="button" class="${!showReal?'active':''}" data-look-photo-view="collage" data-look-photo-id="${l.id}" aria-pressed="${!showReal}">✧ Collage</button><button type="button" class="${showReal?'active':''}" data-look-photo-view="real" data-look-photo-id="${l.id}" aria-pressed="${showReal}">♡ So getragen</button></div>`:''}
     <img src="${image}" class="look-preview" alt="${escaped(l.name)} – ${showReal?'angezogenes Foto':'Collage'}" loading="lazy">
     <div class="look-details"><h3>${escaped(l.name)}</h3><p>${escaped(l.occasion||'Alltag')} · ${l.layers.length} Teil${l.layers.length===1?'':'e'}</p>
