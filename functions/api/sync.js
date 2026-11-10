@@ -11,7 +11,7 @@ async function records(env,type){
   try{const d=JSON.parse(row.data_json);
    if(d._cloudImages){for(const [field,key] of Object.entries(d._cloudImages))d[field]=await env.ATELIER_IMAGES.get(key)||'';delete d._cloudImages;}
    if(type==='garments'&&row.image_key)d.image=await env.ATELIER_IMAGES.get(row.image_key)||'';
-   if(type==='looks'&&row.worn_photo_key)d.wornPhoto=await env.ATELIER_IMAGES.get(row.worn_photo_key)||'';
+   if(type==='looks'&&row.worn_photo_key){const photo=await env.ATELIER_IMAGES.get(row.worn_photo_key);if(photo)d.realPhoto=photo;}
    result.push(d);
   }catch{}
  }
@@ -32,7 +32,7 @@ export async function onRequestPost({request,env}){
   if(action==='delete'){
    await env.ATELIER_DB.prepare(`DELETE FROM ${type} WHERE id=? AND wardrobe_id='family'`).bind(id).run();
    await env.ATELIER_DB.prepare('INSERT OR REPLACE INTO deleted_records(type,id,updated_at) VALUES(?,?,?)').bind(type,id,Date.now()).run();
-   if(type==='garments')await env.ATELIER_IMAGES.delete(imageKey(type,id));
+   if(type==='garments')await env.ATELIER_IMAGES.delete(imageKey(type,id));if(type==='looks')await env.ATELIER_IMAGES.delete(`worn/${id}`);
    return json({ok:true});
   }
   const record=body.record;if(!record||record.id!==id||typeof record!=='object')return json({error:'Invalid record'},400);
@@ -41,10 +41,13 @@ export async function onRequestPost({request,env}){
    if(copy.image.length>2600000)return json({error:'Please compress image'},413);
    imgKey=imageKey(type,id);await env.ATELIER_IMAGES.put(imgKey,copy.image);delete copy.image;
   }else if(type==='garments'){const row=await env.ATELIER_DB.prepare('SELECT image_key FROM garments WHERE id=?').bind(id).first();imgKey=row?.image_key||null}
-  if(type==='looks'&&typeof copy.wornPhoto==='string'&&copy.wornPhoto.startsWith('data:image/')){
-   if(copy.wornPhoto.length>2600000)return json({error:'Please compress photo'},413);
-   photoKey=`worn/${id}`;await env.ATELIER_IMAGES.put(photoKey,copy.wornPhoto);delete copy.wornPhoto;
-  }else if(type==='looks'){const row=await env.ATELIER_DB.prepare('SELECT worn_photo_key FROM looks WHERE id=?').bind(id).first();photoKey=row?.worn_photo_key||null}
+  if(type==='looks'){
+   const row=await env.ATELIER_DB.prepare('SELECT worn_photo_key FROM looks WHERE id=? AND wardrobe_id=\'family\'').bind(id).first();photoKey=row?.worn_photo_key||null;
+   const newPhoto=typeof copy.realPhoto==='string'&&copy.realPhoto.startsWith('data:image/')?copy.realPhoto:(typeof copy.wornPhoto==='string'&&copy.wornPhoto.startsWith('data:image/')?copy.wornPhoto:null);
+   if(newPhoto){if(newPhoto.length>2600000)return json({error:'Please compress photo'},413);photoKey=`worn/${id}`;await env.ATELIER_IMAGES.put(photoKey,newPhoto);}
+   else if(copy.realPhoto===null&&photoKey){await env.ATELIER_IMAGES.delete(photoKey);photoKey=null;}
+   delete copy.realPhoto;delete copy.wornPhoto;
+  }
   const updated=Number(copy.updated)||Date.now();
   if(type==='garments')await env.ATELIER_DB.prepare('INSERT INTO garments(id,wardrobe_id,name,category,color,season,favorite,image_key,data_json,updated_at) VALUES(?,\'family\',?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,category=excluded.category,color=excluded.color,season=excluded.season,favorite=excluded.favorite,image_key=excluded.image_key,data_json=excluded.data_json,updated_at=excluded.updated_at').bind(id,String(copy.name||'Kleidung'),copy.category||null,copy.color||null,copy.season||null,copy.favorite?1:0,imgKey,JSON.stringify(copy),String(updated)).run();
   if(type==='looks')await env.ATELIER_DB.prepare('INSERT INTO looks(id,wardrobe_id,name,occasion,notes,layers_json,worn_photo_key,data_json,updated_at) VALUES(?,\'family\',?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,occasion=excluded.occasion,notes=excluded.notes,layers_json=excluded.layers_json,worn_photo_key=excluded.worn_photo_key,data_json=excluded.data_json,updated_at=excluded.updated_at').bind(id,String(copy.name||'Look'),copy.occasion||null,copy.notes||null,JSON.stringify(copy.layers||[]),photoKey,JSON.stringify(copy),String(updated)).run();
