@@ -15,7 +15,7 @@ async function localRead(){const d=await dbOpen();try{return await new Promise((
 async function localPut(type,record){const d=await dbOpen();try{await new Promise((res,rej)=>{const tx=d.transaction(type,'readwrite');tx.objectStore(type).put(record);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error)})}finally{d.close()}}
 async function localDelete(type,id){const d=await dbOpen();try{await new Promise((res,rej)=>{const tx=d.transaction(type,'readwrite');tx.objectStore(type).delete(id);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}finally{d.close()}}
 function stamp(x){return Number(x.updated||x.created||0)}
-function fingerprint(data){return TYPES.map(t=>data[t].map(r=>`${r.id}/${stamp(r)}/${r.image?.length||0}/${r.wornPhoto?.length||0}`).sort().join(';')).join('|')}
+function fingerprint(data){return TYPES.map(t=>data[t].map(r=>`${r.id}/${stamp(r)}/${r.image?.length||0}/${r.realPhoto?.length||r.wornPhoto?.length||0}`).sort().join(';')).join('|')}
 function label(msg){if(statusEl)statusEl.textContent=msg}
 async function api(path,options){const r=await fetch('/api/'+path,{credentials:'same-origin',cache:'no-store',...options});let v;try{v=await r.json()}catch{throw Error('Server antwortet nicht korrekt')}if(!r.ok)throw Error(v.error||`HTTP ${r.status}`);return v}
 async function sync(){if(!active||busy||importPaused)return;busy=true;chipState('working','↻ Cloud wird synchronisiert …');try{
