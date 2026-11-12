@@ -96,3 +96,24 @@ save/reopen, export and isolated cloud hydration checks. Softer alpha shadows
 use matching CSS/Canvas parameters; PWA shell cache and module URL are v2.
 Physical Safari/iPhone testing and appraisal with actual wardrobe images remain
 manual checks; automated fixtures use synthetic transparent garment silhouettes.
+
+Final polish (v3): closer main-piece targets, inward/upward shoes and accessory
+anchors, stronger group-distance and unused-space scoring, and a lower overlap
+penalty. Main top/bottom overlap is capped at 6% (Compact 8%); Magazine bags keep
+the 6% budget. This uses alpha-cropped rotated envelopes, not pixel intersection.
+Size caps are unchanged. CSS and PNG shadows use 16% opacity with a softer blur
+and a small lower-right offset. The shell cache and layout URL are now v3.
+The representative three-piece regression targets approximately 80–90% of the
+usable 94 × 114 composition area, with grid/rotation tolerance (77–91%).
+
+Read-only investigation of “Teile auswählen (119)”: index.html renderStrip reads
+state.garments.length. reloadData replaces that array with IndexedDB getAll;
+it does not append on sync events. The garments store has keyPath 'id', so the
+same exact ID cannot occur twice in this persisted store. Cloud sync also uses
+Maps keyed by ID and local put, not append. Different IDs can still describe
+the same garment/image: sync merges their union, while import only treats equal
+IDs as conflicts; it does not deduplicate by photograph or name. Thus 53 older
+records plus additional IDs can raise the count. The 53-record test fixture is
+not evidence of the user's current wardrobe count. No iPhone database/backup or
+authenticated live data was available here, so 119 distinct garments versus
+semantic duplicates remains unverified. No records were changed or deleted.

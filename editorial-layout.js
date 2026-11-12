@@ -36,14 +36,14 @@
     return {x:layer.x,y:layer.y*1.2,w:Math.abs(w*Math.cos(a))+Math.abs(h*Math.sin(a)),h:Math.abs(w*Math.sin(a))+Math.abs(h*Math.cos(a))};
   }
   function intersects(a,b,gap=.6) {return Math.abs(a.x-b.x)<(a.w+b.w)/2+gap && Math.abs(a.y-b.y)<(a.h+b.h)/2+gap;}
-  function inside(b) {return b.x-b.w/2>=3 && b.x+b.w/2<=97 && b.y-b.h/2>=3 && b.y+b.h/2<=HEIGHT-3;}
+  function inside(b) {return b.x-b.w/2>=3-1e-9 && b.x+b.w/2<=97+1e-9 && b.y-b.h/2>=3-1e-9 && b.y+b.h/2<=HEIGHT-3+1e-9;}
   // Width/height caps are category-specific; shoes remain a strong visual anchor.
   const sizes={top:[58,57],pants:[40,81],skirt:[49,65],dress:[50,94],jacket:[49,68],shoes:[41,33],bag:[31,36],accessory:[16,19],other:[32,36]};
   const variantNames=['Editorial Left','Editorial Right','Compact','Magazine'];
-  const left={top:[32,34],pants:[70,65],skirt:[68,68],dress:[43,54],jacket:[76,30],shoes:[29,94],bag:[79,27],accessory:[78,102],other:[26,70]};
+  const left={top:[32,35],pants:[68,64],skirt:[68,68],dress:[43,54],jacket:[76,30],shoes:[34,91],bag:[76,29],accessory:[74,97],other:[26,70]};
   const anchors=[left,Object.fromEntries(Object.entries(left).map(([k,[x,y]])=>[k,[100-x,y]])),
-    {top:[33,32],pants:[71,73],skirt:[66,68],dress:[50,55],jacket:[74,32],shoes:[31,100],bag:[77,24],accessory:[24,67],other:[25,72]},
-    {top:[62,33],pants:[30,68],skirt:[32,69],dress:[56,55],jacket:[77,66],shoes:[73,98],bag:[20,23],accessory:[77,68],other:[23,101]}];
+    {top:[32,36],pants:[68,66],skirt:[66,68],dress:[50,55],jacket:[74,32],shoes:[36,91],bag:[74,29],accessory:[29,67],other:[25,72]},
+    {top:[66,35],pants:[34,60],skirt:[32,69],dress:[56,55],jacket:[77,66],shoes:[68,92],bag:[24,27],accessory:[77,68],other:[23,101]}];
   function overlap(a,b) {
     const w=Math.max(0,Math.min(a.x+a.w/2,b.x+b.w/2)-Math.max(a.x-a.w/2,b.x-b.w/2));
     const h=Math.max(0,Math.min(a.y+a.h/2,b.y+b.h/2)-Math.max(a.y-a.h/2,b.y-b.h/2));
@@ -51,10 +51,11 @@
   }
   function compatible(a,b,variant) {
     // Locked pieces and small details always keep a clear gap. Main garments may
-    // touch at their bounding-box corners; never conceal more than 4% of either.
+    // overlap deliberately at their bounding-box corners, capped at 6–8%
+    // of the smaller alpha-cropped envelope (a conservative silhouette proxy).
     const pair=[a.kind,b.kind];
     const allowed=!a.locked&&!b.locked&&(pair.includes('top')&&pair.some(k=>['pants','skirt'].includes(k)) || variant===3&&pair.includes('bag')&&pair.some(k=>['top','pants','skirt','dress','jacket','shoes'].includes(k)));
-    return allowed ? overlap(a,b)<=.04 : !intersects(a,b);
+    return allowed ? overlap(a,b)<=(variant===2?.08:.06) : !intersects(a,b);
   }
   function placementScore(b,placed,anchor,kind,variant) {
     let score=(b.x-anchor[0])**2+(b.y-anchor[1])**2;
@@ -64,7 +65,7 @@
     const cx=group.reduce((s,p)=>s+p.x,0)/group.length,cy=group.reduce((s,p)=>s+p.y,0)/group.length;
     score+=.15*((b.x-cx)**2+(b.y-cy)**2);
     const related=kind==='belt'?placed.filter(p=>['pants','skirt'].includes(p.kind)):group;
-    if(related.length)score+= (kind==='belt'?2:.5)*Math.min(...related.map(p=>{
+    if(related.length)score+= (kind==='belt'?2:kind==='shoes'?1.8:1)*Math.min(...related.map(p=>{
       const dx=Math.max(0,Math.abs(b.x-p.x)-(b.w+p.w)/2),dy=Math.max(0,Math.abs(b.y-p.y)-(b.h+p.h)/2);return dx*dx+dy*dy;
     }));
     const all=[...placed,b],area=all.reduce((s,p)=>s+p.w*p.h,0);
@@ -72,8 +73,8 @@
     score+=.12*((balanceX-50)**2+(balanceY-60)**2);
     const hullW=Math.max(...all.map(p=>p.x+p.w/2))-Math.min(...all.map(p=>p.x-p.w/2));
     const hullH=Math.max(...all.map(p=>p.y+p.h/2))-Math.min(...all.map(p=>p.y-p.h/2));
-    score+=(variant===2?.055:.025)*Math.max(0,hullW*hullH-area);
-    for(const p of placed)score+=overlap(b,p)*1800;
+    score+=(variant===2?.09:.045)*Math.max(0,hullW*hullH-area);
+    for(const p of placed)score+=overlap(b,p)*450;
     const edge=Math.min(b.x-b.w/2,100-b.x-b.w/2,b.y-b.h/2,120-b.y-b.h/2);
     return score+12/Math.max(1,edge);
   }
@@ -132,7 +133,7 @@
       const w=l.w*unit,h=w/crop.aspect;
       // Render a local matte first, so the soft shadow rotates with the garment, just like CSS.
       const matte=document.createElement('canvas'),pad=Math.ceil(3*unit);matte.width=Math.ceil(w+2*pad);matte.height=Math.ceil(h+2*pad);
-      const m=matte.getContext('2d');m.shadowColor='rgba(74,53,32,0.12)';m.shadowBlur=.9*unit;m.shadowOffsetY=.45*unit;
+      const m=matte.getContext('2d');m.shadowColor='rgba(74,53,32,0.16)';m.shadowBlur=1.2*unit;m.shadowOffsetX=.22*unit;m.shadowOffsetY=.6*unit;
       m.drawImage(img,crop.x*img.naturalWidth,crop.y*img.naturalHeight,crop.w*img.naturalWidth,crop.h*img.naturalHeight,pad,pad,w,h);
       ctx.save();ctx.translate(l.x*unit,l.y/100*c.height);ctx.rotate((l.angle||0)*Math.PI/180);ctx.drawImage(matte,-w/2-pad,-h/2-pad);ctx.restore();
     }
