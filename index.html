@@ -837,8 +837,8 @@ body.focus-open #ba-cloud-toggle,body.focus-open #ba-cloud-sync-indicator{displa
   const endPointer=e=>{if(e.pointerType==='touch')return;if(e.pointerId===activePointer){activePointer=null;gesture=null}};
   for(const name of ['pointerup','pointercancel','lostpointercapture'])board.addEventListener(name,endPointer);
   board.addEventListener('dblclick',e=>{if(state.boardMode==='editorial')return;const target=findTouchedLayer(e.target);if(!target)return;const l=state.layers.find(x=>x.id===target.dataset.layer);if(!l)return;const g=state.garments.find(x=>x.id===l.gid);if(!g||l.locked)return;const preset=state.boardMode==='collage'?collagePlacement(g):defaultPlacement(g);Object.assign(l,{...preset,angle:0});state.chosen=l.id;renderStudio();toast('Größe und Position zurückgesetzt.')});
-  // Avoid lost selection when tapping truly empty canvas.
-  board.addEventListener('click',e=>{if(!findTouchedLayer(e.target)&&!activeTouches.size)deselectLayer()});
+  // Empty canvas is handled on pointerdown/touchstart above. A captured mouse
+  // pointer retargets click to the board, so click must not clear its selection.
 
   setInteractionMode('move');
   $('#plan-date').value=localDate();$('#plan-form').onsubmit=savePlan;$('#check-storage').onclick=refreshStorageStatus;$('#test-storage').onclick=testStorage;$('#request-persistence').onclick=requestPersistence;$('#backup-export').onclick=downloadBackup;$('#backup-choose').onclick=()=>$('#backup-file').click();$('#backup-file').onchange=e=>importBackup(e.target.files?.[0]);$('#clear-data').onclick=clearAll;
