@@ -1,6 +1,6 @@
 /* Bahar's Atelier 7.0 — network-first app shell, offline fallback */
-const CACHE = 'bahars-atelier-v7.0.0';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE = 'bahars-atelier-editorial-v3';
+const SHELL = ['./', './index.html', './editorial-layout.js?v=3', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });

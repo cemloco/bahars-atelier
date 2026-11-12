@@ -36,3 +36,84 @@ the existing automatic sync and its timestamp conflict policy. This may then cha
 the local wardrobe in the usual way. The original file is never written to.
 Live D1/KV verification happens when the user performs the import on the configured
 preview; the automated tests do not claim to have imported the user's actual backup.
+
+Editorial Flatlay (development branch only):
+
+- `npm test` includes alpha-bound analysis, the six requested outfit combinations
+  in four deterministic variants, bounds/collision checks, unusual aspect ratios,
+  repeated categories, locks, and an editorial/legacy sync round trip. All cloud
+  tests use the existing in-memory SQLite/KV fixture, never a deployed database.
+- `node tests/browser-editorial.cjs` uses the installed Playwright and Chromium.
+  It exercises the actual mobile UI for all six combinations: native touch drag,
+  resize/rotation controls, rearranging, add/remove, save/reopen, export, preserved
+  legacy garments/photos/calendar, and copying instead of overwriting a saved
+  editorial look. Two fresh mobile browser contexts restore an eight-piece look
+  through the existing sync client and endpoint backed by the isolated fixture.
+  Screenshots and 1800 × 2160 PNG exports go to ignored `work/`.
+
+The active application is the inline script in `index.html`; the older standalone
+`app.js` is not loaded. `editorial-layout.js` is a dependency-free browser script
+with pure geometry helpers usable from Node. Editorial layer `crop` values are
+normalized source-image bounds and include the visible aspect ratio; source
+images remain unchanged. Existing `mode`, `layers` and `theme` persistence carries
+these fields through the existing cloud endpoint. `layoutVersion: 1` and
+`layoutVariant` identify new editorial compositions; no database migration or
+rewrite of older looks is performed. Saving in Auto-Layout creates a new look.
+
+Auto-Layout uses category/subcategory roles, aspect ratios, alpha bounds, a
+free-space search with rotated bounding boxes, and common scale reduction when
+needed. Four art-directed target sets provide variants; these are preferences,
+not fixed coordinates. Locked items retain their position; a locked item outside
+the safe area produces an actionable error instead of silently moving it.
+Completely transparent or unreadable photos fail without removing any layers.
+Opaque photo backgrounds remain visible. There is no automatic background
+removal and no AI service. The export is an unbranded beige PNG with alpha-shaped
+shadows; the saved preview stays at 900 × 1080 to limit sync payload size.
+
+These fixtures establish behavior and geometry, not subjective quality with the
+user's actual wardrobe. Physical iPhone/Safari, native iOS sharing, live Cloudflare
+publication, and a real second iPhone still require verification on the test site.
+
+Auto-Layout 2.0 adds category-specific size caps (top +21%, pants +16–18%,
+shoes +37%, bags +16–19%) before aspect-ratio fitting and packing retries.
+Left/Right use mirrored targets, Compact uses nearly straight garments and a
+stronger compactness score, Magazine uses larger rotations. Scoring combines
+category targets, garment distance, main-group centre, area-weighted balance,
+unused bounding-envelope area, edge clearance and overlap cost. Belts prefer
+the trouser waist. Only top/bottom pairs and Magazine bags next to larger pieces
+may intersect, capped at 4% of the smaller rotated bounding rectangle per pair;
+locked pieces and small details retain clearance. This conservative rectangle
+budget does not claim pixel-level silhouette collision detection.
+
+The 70–85% utilization regression measures the outfit's bounding envelope for
+three representative pieces, not opaque-pixel coverage. Other shapes/counts
+adapt to available space; locked items can prevent an ideal composition.
+The mobile browser regression cycles all four variants for every combination
+and checks bounds and button separation. It compares the CSS preview with the
+downloaded PNG at mobile resolution (mean RGB error below 5/255, excluding
+the outer three pixels). It also retains touch editing,
+save/reopen, export and isolated cloud hydration checks. Softer alpha shadows
+use matching CSS/Canvas parameters; PWA shell cache and module URL are v2.
+Physical Safari/iPhone testing and appraisal with actual wardrobe images remain
+manual checks; automated fixtures use synthetic transparent garment silhouettes.
+
+Final polish (v3): closer main-piece targets, inward/upward shoes and accessory
+anchors, stronger group-distance and unused-space scoring, and a lower overlap
+penalty. Main top/bottom overlap is capped at 6% (Compact 8%); Magazine bags keep
+the 6% budget. This uses alpha-cropped rotated envelopes, not pixel intersection.
+Size caps are unchanged. CSS and PNG shadows use 16% opacity with a softer blur
+and a small lower-right offset. The shell cache and layout URL are now v3.
+The representative three-piece regression targets approximately 80–90% of the
+usable 94 × 114 composition area, with grid/rotation tolerance (77–91%).
+
+Read-only investigation of “Teile auswählen (119)”: index.html renderStrip reads
+state.garments.length. reloadData replaces that array with IndexedDB getAll;
+it does not append on sync events. The garments store has keyPath 'id', so the
+same exact ID cannot occur twice in this persisted store. Cloud sync also uses
+Maps keyed by ID and local put, not append. Different IDs can still describe
+the same garment/image: sync merges their union, while import only treats equal
+IDs as conflicts; it does not deduplicate by photograph or name. Thus 53 older
+records plus additional IDs can raise the count. The 53-record test fixture is
+not evidence of the user's current wardrobe count. No iPhone database/backup or
+authenticated live data was available here, so 119 distinct garments versus
+semantic duplicates remains unverified. No records were changed or deleted.
