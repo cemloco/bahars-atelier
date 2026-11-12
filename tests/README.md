@@ -73,3 +73,26 @@ shadows; the saved preview stays at 900 × 1080 to limit sync payload size.
 These fixtures establish behavior and geometry, not subjective quality with the
 user's actual wardrobe. Physical iPhone/Safari, native iOS sharing, live Cloudflare
 publication, and a real second iPhone still require verification on the test site.
+
+Auto-Layout 2.0 adds category-specific size caps (top +21%, pants +16–18%,
+shoes +37%, bags +16–19%) before aspect-ratio fitting and packing retries.
+Left/Right use mirrored targets, Compact uses nearly straight garments and a
+stronger compactness score, Magazine uses larger rotations. Scoring combines
+category targets, garment distance, main-group centre, area-weighted balance,
+unused bounding-envelope area, edge clearance and overlap cost. Belts prefer
+the trouser waist. Only top/bottom pairs and Magazine bags next to larger pieces
+may intersect, capped at 4% of the smaller rotated bounding rectangle per pair;
+locked pieces and small details retain clearance. This conservative rectangle
+budget does not claim pixel-level silhouette collision detection.
+
+The 70–85% utilization regression measures the outfit's bounding envelope for
+three representative pieces, not opaque-pixel coverage. Other shapes/counts
+adapt to available space; locked items can prevent an ideal composition.
+The mobile browser regression cycles all four variants for every combination
+and checks bounds and button separation. It compares the CSS preview with the
+downloaded PNG at mobile resolution (mean RGB error below 5/255, excluding
+the outer three pixels). It also retains touch editing,
+save/reopen, export and isolated cloud hydration checks. Softer alpha shadows
+use matching CSS/Canvas parameters; PWA shell cache and module URL are v2.
+Physical Safari/iPhone testing and appraisal with actual wardrobe images remain
+manual checks; automated fixtures use synthetic transparent garment silhouettes.

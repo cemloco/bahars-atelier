@@ -33,6 +33,17 @@ const combos=[[0,1],[0,1,2],[0,1,2,3],[0,1,2,4,5],[6,2,3],[0,1,2,3,4,5,7,8]];
   const first=await page.locator('.outfit-layer').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('style')));
   await page.locator('#auto-arrange').click();await page.waitForFunction(()=>document.querySelector('#layout-status').textContent.includes('Variante 2'));
   assert.notDeepEqual(await page.locator('.outfit-layer').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('style'))),first);
+  // Cycle through all four variants on every outfit, including the dynamic Magazine layout.
+  const variantStyles=[];
+  for(const variant of [2,3,0,1]){
+   await page.locator('#auto-arrange').click();
+   await page.waitForFunction(v=>document.querySelector('#layout-status').textContent.includes('Variante '+(v+1)),variant);
+   variantStyles.push(await page.locator('.outfit-layer').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('style')).join('|')));
+   await page.locator('.outfit-layer').evaluateAll(nodes=>{const board=document.querySelector('#studio-board').getBoundingClientRect();for(const n of nodes){const b=n.getBoundingClientRect();if(b.left<board.left||b.top<board.top||b.right>board.right||b.bottom>board.bottom)throw Error('variant clipped');}});
+   const board=await page.locator('#studio-board').boundingBox(),button=await page.locator('#auto-arrange').boundingBox();
+   assert.ok(button.y+button.height<=board.y||button.y>=board.y+board.height,'layout button overlaps outfit');
+  }
+  assert.equal(new Set(variantStyles).size,4);
   const boxes=await page.locator('.outfit-layer').evaluateAll(nodes=>{const board=document.querySelector('#studio-board').getBoundingClientRect();return nodes.map(n=>{const b=n.getBoundingClientRect();if(b.left<board.left||b.top<board.top||b.right>board.right||b.bottom>board.bottom)throw Error('clipped');return {width:b.width,height:b.height};});});assert.equal(boxes.length,combo.length);
   // Finger drag through Chromium's native input path (same Touch Event handlers used on Safari).
   const layer=page.locator('.outfit-layer').first();let bounds=await layer.boundingBox();const cdp=await context.newCDPSession(page),x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
@@ -46,6 +57,16 @@ const combos=[[0,1],[0,1,2],[0,1,2,3],[0,1,2,4,5],[6,2,3],[0,1,2,3,4,5,7,8]];
   const downloadPromise=page.waitForEvent('download');await page.locator('#focus-export').click();const download=await downloadPromise;await download.saveAs(`work/editorial-${index+1}.png`);
   const exported=await page.evaluate(async()=>{const layers=[...document.querySelectorAll('.outfit-layer')];return layers.length;});assert.equal(exported,combo.length);
   const imageDimensions=await page.evaluate(async(data)=>{const i=new Image();await new Promise(r=>{i.onload=r;i.src=data});const c=document.createElement('canvas');c.width=i.width;c.height=i.height;const ctx=c.getContext('2d');ctx.drawImage(i,0,0);return {w:i.width,h:i.height,pixel:[...ctx.getImageData(5,5,1,1).data]};},'data:image/png;base64,'+(await fs.readFile(`work/editorial-${index+1}.png`)).toString('base64'));assert.deepEqual(imageDimensions,{w:1800,h:2160,pixel:[242,235,223,255]});
+  // Compare the rendered CSS preview with the downloaded Canvas export at mobile size.
+  const clean=await page.addStyleTag({content:'.outfit-layer.selected{outline:none!important}.outfit-layer button{visibility:hidden!important}'});
+  const preview=await page.locator('#studio-board').screenshot();await clean.evaluate(n=>n.remove());
+  const difference=await page.evaluate(async([preview,exported])=>{
+   const load=async src=>{const i=new Image();await new Promise((r,j)=>{i.onload=r;i.onerror=j;i.src=src});return i};
+   const a=await load(preview),b=await load(exported),c=document.createElement('canvas');c.width=a.width;c.height=a.height;const ctx=c.getContext('2d');
+   ctx.drawImage(a,0,0);const p=ctx.getImageData(0,0,c.width,c.height).data;ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(b,0,0,c.width,c.height);const q=ctx.getImageData(0,0,c.width,c.height).data;
+   let sum=0,count=0;for(let y=3;y<c.height-3;y++)for(let x=3;x<c.width-3;x++)for(let k=0;k<3;k++){const i=(y*c.width+x)*4+k;sum+=Math.abs(p[i]-q[i]);count++}return sum/count;
+  },['data:image/png;base64,'+preview.toString('base64'),'data:image/png;base64,'+(await fs.readFile(`work/editorial-${index+1}.png`)).toString('base64')]);
+  assert.ok(difference<5,`preview/export pixel difference: ${difference}`);
   await page.locator('#focus-save').click();await page.locator('#look-name').fill('Editorial '+index);await page.locator('#look-form button[type=submit]').click();await page.waitForFunction(()=>document.querySelector('#look-modal').hidden);
   const saved=await page.evaluate(async()=>{const db=await new Promise(r=>{const q=indexedDB.open('BaharsAtelier_v1',1);q.onsuccess=()=>r(q.result)});const all=await Promise.all(['garments','looks','plans'].map(k=>new Promise(r=>{const q=db.transaction(k).objectStore(k).getAll();q.onsuccess=()=>r(q.result)})));db.close();return {garments:all[0],looks:all[1],plans:all[2]};});
   assert.deepEqual(saved.garments,original.garments);assert.deepEqual(saved.looks.find(l=>l.id==='legacy'),original.legacy);assert.deepEqual(saved.plans,[original.plan]);lastSaved=saved;const look=saved.looks.find(l=>l.mode==='editorial');assert.equal(look.layers.length,combo.length);assert.ok(look.layers.every(l=>l.crop));
